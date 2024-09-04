@@ -13,6 +13,7 @@ import (
 )
 
 var addr = flag.String("addr", "localhost:8080", "HTTP server address")
+var host = flag.Bool("host", false, "Set host mode if you want to create a new room")
 
 func main() {
 	flag.Parse()
@@ -20,7 +21,12 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	u := url.URL{Scheme: "ws", Host: *addr, Path: "/echo"}
+	u := url.URL{Scheme: "ws", Host: *addr, Path: "/join"}
+
+	if *host {
+		u.Path = "/host"
+	}
+
 	log.Printf("Connecting to %s", u.String())
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
