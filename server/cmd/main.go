@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"server/pkg/server"
+	"server/internal/server"
 )
 
 var addr = flag.String("addr", "localhost:8080", "HTTP server address")
