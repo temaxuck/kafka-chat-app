@@ -21,10 +21,17 @@ func NewRoom() Room {
 	}
 }
 
+func (r Room) IsEmpty() bool {
+	return len(r.clients) == 0
+}
+
 func (r *Room) AddClient(c Client) {
 	r.clients[c.ClientId] = c
 }
 
-func (r *Room) RemoveClient(c Client) {
+// Removes client from room and returns a boolean value
+// indicating whether the room is empty
+func (r *Room) RemoveClient(c Client) bool {
 	delete(r.clients, c.ClientId)
+	return r.IsEmpty()
 }

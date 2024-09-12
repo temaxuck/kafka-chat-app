@@ -67,13 +67,7 @@ func (c *Client) Listen() {
 	for c.alive {
 		incoming, err := c.consumer.ReadMessage(10 * time.Millisecond)
 		if err == nil {
-			var metadata MessageMeta
-			err := metadata.deserialize(incoming.Key)
-			if err != nil {
-				log.Println("Couldn't deserialize message metadata:", err)
-				continue
-			}
-			if metadata.RoomId == c.room.RoomId && metadata.SenderId != c.ClientId {
+			if string(incoming.Key) == c.room.RoomId {
 				err = c.wsConn.WriteMessage(websocket.TextMessage, incoming.Value)
 				if err != nil {
 					log.Println("write:", err)
@@ -102,20 +96,14 @@ func (c *Client) Talk(wg *sync.WaitGroup) {
 			break
 		}
 
-		log.Printf("Recieved message from %s: %s\n", c.wsConn.RemoteAddr(), outcoming)
-		metadata, err := (MessageMeta{RoomId: c.room.RoomId, SenderId: c.ClientId}).serialize()
-		if err != nil {
-			log.Println("Message hasn't been sent. Couldn't serialize message metadata:", err)
-			continue
-		}
+		log.Printf("Recieved message from %s: %s", c.wsConn.RemoteAddr(), string(outcoming))
 		c.producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{
 				Topic:     &topic,
 				Partition: 0,
 			},
-
-			Key:   metadata,
-			Value: []byte(outcoming),
+			Key:   []byte(c.room.RoomId),
+			Value: outcoming,
 		}, nil)
 	}
 }

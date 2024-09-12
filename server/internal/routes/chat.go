@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"server/internal/app"
+	"server/pkg/app"
 	"sync"
-
-	"github.com/gorilla/websocket"
 )
 
 const kafkaServers = "localhost:29092" // TODO: Unhardcode
@@ -34,12 +32,8 @@ func Host(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Room#%s has been created and is hosted by Client#%s\n", room.RoomId, client.ClientId)
 
-	err = c.WriteMessage(
-		websocket.TextMessage,
-		[]byte(
-			fmt.Sprintf("You are hosting room with id: %s\nShare the id with someone to have a chat!", room.RoomId),
-		),
-	)
+	initMsg := app.NewMessage(app.MTInit, &room.RoomId, nil, &client.ClientId)
+	err = c.WriteJSON(initMsg)
 	if err != nil {
 		log.Println("write:", err)
 		return
@@ -71,36 +65,31 @@ func Join(w http.ResponseWriter, r *http.Request) {
 
 	var roomId string
 
+	// Prompt for room id
 	for {
-		err = c.WriteMessage(
-			websocket.TextMessage,
-			[]byte(
-				"Join chat using room id: ",
-			),
-		)
+		var connectMsg app.Message
+		err = c.ReadJSON(&connectMsg)
 		if err != nil {
-			log.Println("write:", err)
-			return
+			log.Println("deserialize:", err)
+			sErr := fmt.Sprintf("Couldn't read json: %v", err)
+			errorMsg := app.NewMessage(app.MTError, nil, nil, &sErr)
+			err = c.WriteJSON(errorMsg)
+			continue
 		}
 
-		_, msg, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
-			return
+		if connectMsg.RoomId == nil {
+			roomId = ""
+		} else {
+			roomId = *connectMsg.RoomId
 		}
-
-		roomId = string(msg)
 
 		if _, ok := rooms[roomId]; ok {
 			break
 		}
 
-		err = c.WriteMessage(
-			websocket.TextMessage,
-			[]byte(
-				"Wrong room id, try again please: ",
-			),
-		)
+		sErr := "Wrong room id, try again please"
+		errorMsg := app.NewMessage(app.MTError, nil, nil, &sErr)
+		err = c.WriteJSON(errorMsg)
 		if err != nil {
 			log.Println("write:", err)
 			return
@@ -112,12 +101,8 @@ func Join(w http.ResponseWriter, r *http.Request) {
 	client := app.NewClient(&room, c, kafkaServers)
 	room.AddClient(client)
 
-	err = c.WriteMessage(
-		websocket.TextMessage,
-		[]byte(
-			fmt.Sprintf("You successfully connected to room with id: %s", room.RoomId),
-		),
-	)
+	initMsg := app.NewMessage(app.MTInit, &room.RoomId, nil, &client.ClientId)
+	err = c.WriteJSON(initMsg)
 	if err != nil {
 		log.Println("write:", err)
 		return
